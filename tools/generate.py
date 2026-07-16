@@ -150,7 +150,8 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
 @media (prefers-color-scheme: dark){ .banner{ background:#FF6B6B18; border-color:#FF6B6B; color:#FF9B9B; } }
 .lock{
   position:fixed; inset:0; z-index:100; background:var(--bg);
-  display:flex; align-items:center; justify-content:center;
+  display:flex; align-items:flex-start; justify-content:center;
+  padding-top:14vh;
 }
 .lockbox{display:flex; flex-direction:column; gap:12px; width:min(280px, 80vw); text-align:center;}
 .locktitle{font-weight:700; font-size:16px;}
@@ -159,7 +160,8 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
   padding:10px; border:1.5px solid var(--btn-line); border-radius:10px;
   background:var(--card); color:var(--ink); width:100%;
 }
-.lockbox .chip{font-size:15px; padding:10px 14px;}
+.lockbox .chip{font-size:16px; padding:12px 14px; min-height:48px;}
+.lockbox .chip:disabled{opacity:.6;}
 .lockerr{color:#B42323; font-size:13px;}
 :root[data-theme="dark"] .lockerr{color:#FF9B9B;}
 @media (prefers-color-scheme: dark){ .lockerr{color:#FF9B9B;} }
@@ -167,12 +169,12 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
 </style>
 
 <div class="lock" id="lock" hidden>
-  <div class="lockbox">
+  <form class="lockbox" id="lockform">
     <div class="locktitle">🔒 PINを入力してください</div>
-    <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="暗証番号">
-    <button class="chip" id="unlock">開く</button>
+    <input id="pin" type="password" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="暗証番号">
+    <button class="chip" id="unlock" type="submit">開く</button>
     <div class="lockerr" id="lockerr" hidden>PINが違います</div>
-  </div>
+  </form>
 </div>
 
 <header>
@@ -394,13 +396,20 @@ function startApp(){
   document.getElementById('lock').hidden = true;
   build(); load(); render();
 }
+let unlocking = false;
 async function unlock(){
+  if (unlocking) return;
   const el = document.getElementById('pin');
   const pin = el.value.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).trim();
   if (!pin) return;
+  unlocking = true;
+  const btn = document.getElementById('unlock');
   const err = document.getElementById('lockerr');
   err.hidden = true;
+  btn.disabled = true;
+  btn.textContent = '確認中…';
   try {
+    if (!(window.crypto && crypto.subtle)) throw new Error('no-webcrypto');
     const key = await keyFromPin(pin);
     DATA = await decryptWith(key);
     const raw = new Uint8Array(await crypto.subtle.exportKey('raw', key));
@@ -408,10 +417,21 @@ async function unlock(){
     for (let i = 0; i < raw.length; i++) bin += String.fromCharCode(raw[i]);
     storeSet('co-check-key', btoa(bin));
     startApp();
-  } catch(e){ err.hidden = false; el.select(); }
+  } catch(e){
+    err.textContent = (e && e.message === 'no-webcrypto')
+      ? 'このブラウザでは開けません。別のブラウザでお試しください'
+      : 'PINが違います';
+    err.hidden = false;
+    el.select();
+  }
+  btn.disabled = false;
+  btn.textContent = '開く';
+  unlocking = false;
 }
-document.getElementById('unlock').addEventListener('click', unlock);
-document.getElementById('pin').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+document.getElementById('lockform').addEventListener('submit', e => { e.preventDefault(); unlock(); });
+// touchend fires on the touchstart target even if the button shifts when the
+// keyboard closes mid-tap; preventDefault suppresses the synthetic click.
+document.getElementById('unlock').addEventListener('touchend', e => { e.preventDefault(); unlock(); });
 
 (async () => {
   const cached = storeGet('co-check-key');
