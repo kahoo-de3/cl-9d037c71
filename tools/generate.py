@@ -91,6 +91,23 @@ for r in range(5, ws.max_row + 1):
         'o': f'E{r}' in cells,
     })
 
+# Excelに同じ名簿が2ブロック入っていることがあるため、施設名×氏名で重複統合
+# （C/Oフラグは論理和。行番号=保存キーは初出の行を使う）
+seen = {}
+unique_rows = []
+dup_count = 0
+for x in rows:
+    k = (x['f'], x['n'])
+    if k in seen:
+        seen[k]['c'] = seen[k]['c'] or x['c']
+        seen[k]['o'] = seen[k]['o'] or x['o']
+        dup_count += 1
+    else:
+        seen[k] = x
+        unique_rows.append(x)
+rows = unique_rows
+print('重複統合:', dup_count, '行 → ユニーク', len(rows), '行')
+
 # 施設名の読み（五十音順）でソート。同一施設は元のExcel行順を維持
 _SMALL = {'ぁ':'あ','ぃ':'い','ぅ':'う','ぇ':'え','ぉ':'お','っ':'つ','ゃ':'や','ゅ':'ゆ','ょ':'よ','ゎ':'わ'}
 def yomi_key(f):
