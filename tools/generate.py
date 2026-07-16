@@ -38,6 +38,7 @@ enc_js = json.dumps({
     'iv': base64.b64encode(iv).decode(),
     'ct': base64.b64encode(ct).decode(),
     'iter': PBKDF2_ITER,
+    'len': len(pin),
 }, separators=(',', ':'))
 
 print('rows:', len(rows))
@@ -149,11 +150,11 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
 :root[data-theme="dark"] .banner{ background:#FF6B6B18; border-color:#FF6B6B; color:#FF9B9B; }
 @media (prefers-color-scheme: dark){ .banner{ background:#FF6B6B18; border-color:#FF6B6B; color:#FF9B9B; } }
 .lock{
-  position:fixed; inset:0; z-index:100; background:var(--bg);
-  display:flex; align-items:flex-start; justify-content:center;
-  padding-top:14vh;
+  display:flex; justify-content:center;
+  padding:14vh 20px 40px;
 }
 .lockbox{display:flex; flex-direction:column; gap:12px; width:min(280px, 80vw); text-align:center;}
+.lockver{font-size:11px; color:var(--sub); margin-top:16px;}
 .locktitle{font-weight:700; font-size:16px;}
 .lockbox input{
   font:inherit; font-size:22px; text-align:center; letter-spacing:.3em;
@@ -174,6 +175,7 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
     <input id="pin" type="password" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="暗証番号">
     <button class="chip" id="unlock" type="submit">開く</button>
     <div class="lockerr" id="lockerr" hidden>PINが違います</div>
+    <div class="lockver">v3 ・ 最後の桁まで入力すると自動で開きます</div>
   </form>
 </div>
 
@@ -390,10 +392,15 @@ async function keyFromPin(pin){
     {name:'PBKDF2', salt:b64d(ENC.salt), iterations:ENC.iter, hash:'SHA-256'},
     mat, {name:'AES-GCM', length:256}, true, ['decrypt']);
 }
+function setLocked(locked){
+  document.getElementById('lock').hidden = !locked;
+  document.querySelector('header').hidden = locked;
+  document.getElementById('list').hidden = locked;
+}
 function startApp(){
   TOTAL = DATA.length;
   document.getElementById('total').textContent = TOTAL;
-  document.getElementById('lock').hidden = true;
+  setLocked(false);
   build(); load(); render();
 }
 let unlocking = false;
@@ -422,7 +429,8 @@ async function unlock(){
       ? 'このブラウザでは開けません。別のブラウザでお試しください'
       : 'PINが違います';
     err.hidden = false;
-    el.select();
+    el.value = '';
+    el.focus();
   }
   btn.disabled = false;
   btn.textContent = '開く';
@@ -432,6 +440,18 @@ document.getElementById('lockform').addEventListener('submit', e => { e.preventD
 // touchend fires on the touchstart target even if the button shifts when the
 // keyboard closes mid-tap; preventDefault suppresses the synthetic click.
 document.getElementById('unlock').addEventListener('touchend', e => { e.preventDefault(); unlock(); });
+// keyboard stays open: attempt automatically once the last digit is typed
+document.getElementById('pin').addEventListener('input', e => {
+  if (ENC.len && e.target.value.trim().length >= ENC.len) unlock();
+});
+// surface unexpected errors on the lock screen for remote diagnosis
+window.addEventListener('error', ev => {
+  const err = document.getElementById('lockerr');
+  if (err && !document.getElementById('lock').hidden){
+    err.textContent = 'エラー: ' + ev.message;
+    err.hidden = false;
+  }
+});
 
 (async () => {
   const cached = storeGet('co-check-key');
@@ -443,7 +463,7 @@ document.getElementById('unlock').addEventListener('touchend', e => { e.preventD
       return;
     } catch(e){}
   }
-  document.getElementById('lock').hidden = false;
+  setLocked(true);
   document.getElementById('pin').focus();
 })();
 </script>
