@@ -51,35 +51,14 @@ html = """<meta charset="utf-8">
 <title>C/O チェックリスト</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <style>
+/* ユーザー指定により常に白背景（ダークモードでも固定） */
 :root{
-  --bg:#F7F7F4; --card:#FFFFFF; --ink:#1D1D1F; --sub:#6D6D70;
+  --bg:#FFFFFF; --card:#FFFFFF; --ink:#1D1D1F; --sub:#6D6D70;
   --line:#E2E2DE; --accent:#0B7285; --accent-ink:#FFFFFF;
   --partial-bg:#E9E9E6; --partial-ink:#9A9A9C;
   --done-bg:#66666A; --done-ink:#D9D9DC;
   --btn-bg:#FFFFFF; --btn-line:#C9C9C4;
-}
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#161618; --card:#212124; --ink:#EDEDEF; --sub:#98989E;
-    --line:#333338; --accent:#3BA9BE; --accent-ink:#0E2A30;
-    --partial-bg:#2A2A2E; --partial-ink:#6E6E74;
-    --done-bg:#4A4A50; --done-ink:#A9A9B0;
-    --btn-bg:#212124; --btn-line:#4A4A50;
-  }
-}
-:root[data-theme="light"]{
-  --bg:#F7F7F4; --card:#FFFFFF; --ink:#1D1D1F; --sub:#6D6D70;
-  --line:#E2E2DE; --accent:#0B7285; --accent-ink:#FFFFFF;
-  --partial-bg:#E9E9E6; --partial-ink:#9A9A9C;
-  --done-bg:#66666A; --done-ink:#D9D9DC;
-  --btn-bg:#FFFFFF; --btn-line:#C9C9C4;
-}
-:root[data-theme="dark"]{
-  --bg:#161618; --card:#212124; --ink:#EDEDEF; --sub:#98989E;
-  --line:#333338; --accent:#3BA9BE; --accent-ink:#0E2A30;
-  --partial-bg:#2A2A2E; --partial-ink:#6E6E74;
-  --done-bg:#4A4A50; --done-ink:#A9A9B0;
-  --btn-bg:#212124; --btn-line:#4A4A50;
+  color-scheme: light;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;}
@@ -147,8 +126,6 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
   background:#B4232310; border:1px solid #B42323; color:#B42323;
   font-size:12px; line-height:1.5;
 }
-:root[data-theme="dark"] .banner{ background:#FF6B6B18; border-color:#FF6B6B; color:#FF9B9B; }
-@media (prefers-color-scheme: dark){ .banner{ background:#FF6B6B18; border-color:#FF6B6B; color:#FF9B9B; } }
 .lock{
   display:flex; justify-content:center;
   padding:14vh 20px 40px;
@@ -164,8 +141,6 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
 .lockbox .chip{font-size:16px; padding:12px 14px; min-height:48px;}
 .lockbox .chip:disabled{opacity:.6;}
 .lockerr{color:#B42323; font-size:13px;}
-:root[data-theme="dark"] .lockerr{color:#FF9B9B;}
-@media (prefers-color-scheme: dark){ .lockerr{color:#FF9B9B;} }
 @media (prefers-reduced-motion: reduce){ .progress>div{transition:none;} button.co:active{transform:none;} }
 </style>
 
