@@ -1,0 +1,435 @@
+import json, sys, os, base64, hashlib
+import openpyxl
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+# Usage: python generate.py <Book.xlsx> <PIN>  -> writes docs/index.html
+# データはPIN由来の鍵でAES-GCM暗号化して埋め込む（PIN自体はどこにも保存されない）
+xlsx = sys.argv[1]
+pin = sys.argv[2]
+PBKDF2_ITER = 310000
+wb = openpyxl.load_workbook(xlsx)
+ws = wb.active
+cells = {}
+for row in ws.iter_rows(min_row=1, max_row=200):
+    for c in row:
+        if c.value is not None:
+            cells[c.coordinate] = str(c.value)
+rows = []
+for r in range(5, 109):
+    b = cells.get(f'B{r}')
+    if not b:
+        continue
+    rows.append({
+        'r': r,
+        'f': b.strip(),
+        'n': (cells.get(f'C{r}') or '').strip().replace(chr(0xE682), chr(0x7950)),
+        'c': f'D{r}' in cells,
+        'o': f'E{r}' in cells,
+    })
+
+data_js = json.dumps(rows, ensure_ascii=False, separators=(',', ':'))
+
+salt = os.urandom(16)
+iv = os.urandom(12)
+key = hashlib.pbkdf2_hmac('sha256', pin.encode('utf-8'), salt, PBKDF2_ITER, dklen=32)
+ct = AESGCM(key).encrypt(iv, data_js.encode('utf-8'), None)
+enc_js = json.dumps({
+    'salt': base64.b64encode(salt).decode(),
+    'iv': base64.b64encode(iv).decode(),
+    'ct': base64.b64encode(ct).decode(),
+    'iter': PBKDF2_ITER,
+}, separators=(',', ':'))
+
+print('rows:', len(rows))
+print('C-only:', sum(1 for x in rows if x['c'] and not x['o']))
+print('O-only:', sum(1 for x in rows if x['o'] and not x['c']))
+print('both:', sum(1 for x in rows if x['c'] and x['o']))
+
+html = """<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>C/O チェックリスト</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+:root{
+  --bg:#F7F7F4; --card:#FFFFFF; --ink:#1D1D1F; --sub:#6D6D70;
+  --line:#E2E2DE; --accent:#0B7285; --accent-ink:#FFFFFF;
+  --partial-bg:#E9E9E6; --partial-ink:#9A9A9C;
+  --done-bg:#66666A; --done-ink:#D9D9DC;
+  --btn-bg:#FFFFFF; --btn-line:#C9C9C4;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#161618; --card:#212124; --ink:#EDEDEF; --sub:#98989E;
+    --line:#333338; --accent:#3BA9BE; --accent-ink:#0E2A30;
+    --partial-bg:#2A2A2E; --partial-ink:#6E6E74;
+    --done-bg:#4A4A50; --done-ink:#A9A9B0;
+    --btn-bg:#212124; --btn-line:#4A4A50;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#F7F7F4; --card:#FFFFFF; --ink:#1D1D1F; --sub:#6D6D70;
+  --line:#E2E2DE; --accent:#0B7285; --accent-ink:#FFFFFF;
+  --partial-bg:#E9E9E6; --partial-ink:#9A9A9C;
+  --done-bg:#66666A; --done-ink:#D9D9DC;
+  --btn-bg:#FFFFFF; --btn-line:#C9C9C4;
+}
+:root[data-theme="dark"]{
+  --bg:#161618; --card:#212124; --ink:#EDEDEF; --sub:#98989E;
+  --line:#333338; --accent:#3BA9BE; --accent-ink:#0E2A30;
+  --partial-bg:#2A2A2E; --partial-ink:#6E6E74;
+  --done-bg:#4A4A50; --done-ink:#A9A9B0;
+  --btn-bg:#212124; --btn-line:#4A4A50;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;
+  font-size:15px; line-height:1.45;
+}
+header{
+  position:sticky; top:0; z-index:10;
+  background:var(--bg); border-bottom:1px solid var(--line);
+  padding:10px 14px 8px;
+}
+.hrow{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+h1{font-size:15px; font-weight:700; margin:0 auto 0 0; letter-spacing:.02em;}
+select{
+  font:inherit; font-weight:600; color:var(--ink);
+  background:var(--card); border:1px solid var(--btn-line); border-radius:8px;
+  padding:7px 8px; min-height:38px;
+}
+.hrow2{display:flex; align-items:center; gap:10px; margin-top:8px;}
+.progress{flex:1; height:8px; border-radius:4px; background:var(--partial-bg); overflow:hidden;}
+.progress>div{height:100%; width:0%; background:var(--accent); border-radius:4px; transition:width .2s;}
+.count{font-variant-numeric:tabular-nums; font-weight:700; font-size:13px; white-space:nowrap;}
+.count small{font-weight:500; color:var(--sub);}
+.hrow3{display:flex; gap:8px; margin-top:8px;}
+.chip{
+  font:inherit; font-size:13px; font-weight:600;
+  border:1px solid var(--btn-line); background:var(--card); color:var(--ink);
+  border-radius:999px; padding:6px 14px; min-height:34px;
+}
+.chip.on{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+.chip.reset{margin-left:auto; color:var(--sub);}
+main{padding:8px 10px 60px; max-width:640px; margin:0 auto;}
+.row{
+  display:flex; align-items:center; gap:10px;
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:9px 10px 9px 12px; margin-bottom:6px;
+}
+.idx{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums; width:2em; flex:none; text-align:right;}
+.txt{flex:1; min-width:0;}
+.fac{font-weight:600; font-size:14px; overflow-wrap:anywhere;}
+.nm{font-size:13px; color:var(--sub);}
+.btns{display:flex; gap:8px; flex:none;}
+button.co{
+  font:inherit; font-weight:800; font-size:16px;
+  width:46px; height:46px; border-radius:10px;
+  border:1.5px solid var(--btn-line); background:var(--btn-bg); color:var(--ink);
+  display:flex; align-items:center; justify-content:center;
+}
+button.co:active{transform:scale(.94);}
+button.co.on{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+.spacer{width:46px; height:46px; flex:none;}
+/* partial tap -> light gray */
+.row.partial{background:var(--partial-bg);}
+.row.partial .fac, .row.partial .nm, .row.partial .idx{color:var(--partial-ink);}
+/* all tapped -> dark gray */
+.row.done{background:var(--done-bg); border-color:var(--done-bg);}
+.row.done .fac, .row.done .nm, .row.done .idx{color:var(--done-ink);}
+.row.done .fac{text-decoration:line-through; text-decoration-thickness:1px;}
+.row.done button.co.on{background:transparent; border-color:var(--done-ink); color:var(--done-ink);}
+.empty{color:var(--sub); text-align:center; padding:40px 0; font-size:14px;}
+.banner{
+  margin-top:8px; padding:8px 10px; border-radius:8px;
+  background:#B4232310; border:1px solid #B42323; color:#B42323;
+  font-size:12px; line-height:1.5;
+}
+:root[data-theme="dark"] .banner{ background:#FF6B6B18; border-color:#FF6B6B; color:#FF9B9B; }
+@media (prefers-color-scheme: dark){ .banner{ background:#FF6B6B18; border-color:#FF6B6B; color:#FF9B9B; } }
+.lock{
+  position:fixed; inset:0; z-index:100; background:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+}
+.lockbox{display:flex; flex-direction:column; gap:12px; width:min(280px, 80vw); text-align:center;}
+.locktitle{font-weight:700; font-size:16px;}
+.lockbox input{
+  font:inherit; font-size:22px; text-align:center; letter-spacing:.3em;
+  padding:10px; border:1.5px solid var(--btn-line); border-radius:10px;
+  background:var(--card); color:var(--ink); width:100%;
+}
+.lockbox .chip{font-size:15px; padding:10px 14px;}
+.lockerr{color:#B42323; font-size:13px;}
+:root[data-theme="dark"] .lockerr{color:#FF9B9B;}
+@media (prefers-color-scheme: dark){ .lockerr{color:#FF9B9B;} }
+@media (prefers-reduced-motion: reduce){ .progress>div{transition:none;} button.co:active{transform:none;} }
+</style>
+
+<div class="lock" id="lock" hidden>
+  <div class="lockbox">
+    <div class="locktitle">🔒 PINを入力してください</div>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="暗証番号">
+    <button class="chip" id="unlock">開く</button>
+    <div class="lockerr" id="lockerr" hidden>PINが違います</div>
+  </div>
+</div>
+
+<header>
+  <div class="hrow">
+    <h1>C/O チェック</h1>
+    <select id="year" aria-label="年"></select>
+    <select id="month" aria-label="月"></select>
+  </div>
+  <div class="hrow2">
+    <div class="progress"><div id="bar"></div></div>
+    <div class="count"><span id="done">0</span><small> / <span id="total">–</span> 完了</small></div>
+  </div>
+  <div class="hrow3">
+    <button class="chip" id="filter">未完了のみ表示</button>
+    <button class="chip" id="backup">バックアップ</button>
+    <button class="chip" id="restore">復元</button>
+    <button class="chip reset" id="reset">リセット</button>
+  </div>
+  <div class="banner" id="banner" hidden>⚠ この環境ではチェック内容の自動保存が使えないため、閉じると消えます。作業後に「バックアップ」でコピーし、次回「復元」で貼り付けてください。</div>
+</header>
+<main id="list"></main>
+<div class="empty" id="empty" hidden>この月は全件チェック済みです 🎉</div>
+
+<script>
+const ENC = __ENC__;
+let DATA = [];
+let TOTAL = 0;
+
+const yearSel = document.getElementById('year');
+const monthSel = document.getElementById('month');
+for (let y = 2026; y <= 2030; y++) yearSel.add(new Option(y + '年', y));
+for (let m = 1; m <= 12; m++) monthSel.add(new Option(m + '月', m));
+yearSel.value = '2026'; monthSel.value = '7';
+
+let state = {};
+let filterOn = false;
+
+// storage layer: localStorage if usable, otherwise in-memory (with warning banner)
+let storageOK = true;
+try {
+  localStorage.setItem('co-check-test', '1');
+  if (localStorage.getItem('co-check-test') !== '1') throw 0;
+  localStorage.removeItem('co-check-test');
+} catch(e){ storageOK = false; }
+
+const memStore = {};
+function storeGet(key){
+  if (storageOK){ try { return localStorage.getItem(key); } catch(e){} }
+  return Object.prototype.hasOwnProperty.call(memStore, key) ? memStore[key] : null;
+}
+function storeSet(key, val){
+  if (storageOK){ try { localStorage.setItem(key, val); return; } catch(e){ storageOK = false; showBanner(); } }
+  memStore[key] = val;
+}
+function storeKeys(){
+  if (storageOK){
+    try {
+      const ks = [];
+      for (let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if (k && k.indexOf('co-check-') === 0) ks.push(k);
+      }
+      return ks;
+    } catch(e){}
+  }
+  return Object.keys(memStore);
+}
+function showBanner(){ document.getElementById('banner').hidden = false; }
+if (!storageOK) showBanner();
+
+function storageKey(){ return 'co-check-' + yearSel.value + '-' + monthSel.value; }
+function load(){
+  try { state = JSON.parse(storeGet(storageKey())) || {}; }
+  catch(e){ state = {}; }
+}
+function save(){
+  storeSet(storageKey(), JSON.stringify(state));
+}
+
+function rowStatus(item){
+  const s = state[item.r] || {};
+  const need = (item.c ? 1 : 0) + (item.o ? 1 : 0);
+  const got = (item.c && s.c ? 1 : 0) + (item.o && s.o ? 1 : 0);
+  if (got === 0) return 'none';
+  return got >= need ? 'done' : 'partial';
+}
+
+const list = document.getElementById('list');
+const rowEls = {};
+
+function build(){
+  list.textContent = '';
+  for (const item of DATA){
+    const row = document.createElement('div');
+    row.className = 'row';
+    const idx = document.createElement('span');
+    idx.className = 'idx'; idx.textContent = item.r;
+    const txt = document.createElement('div');
+    txt.className = 'txt';
+    const fac = document.createElement('div');
+    fac.className = 'fac'; fac.textContent = item.f;
+    const nm = document.createElement('div');
+    nm.className = 'nm'; nm.textContent = item.n;
+    txt.append(fac, nm);
+    const btns = document.createElement('div');
+    btns.className = 'btns';
+    for (const k of ['c','o']){
+      if (item[k]){
+        const b = document.createElement('button');
+        b.className = 'co'; b.dataset.k = k;
+        b.textContent = k.toUpperCase();
+        b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', () => toggle(item, k));
+        btns.appendChild(b);
+      } else {
+        const sp = document.createElement('span');
+        sp.className = 'spacer';
+        btns.appendChild(sp);
+      }
+    }
+    row.append(idx, txt, btns);
+    list.appendChild(row);
+    rowEls[item.r] = row;
+  }
+}
+
+function toggle(item, k){
+  const s = state[item.r] || (state[item.r] = {});
+  s[k] = !s[k];
+  save();
+  render();
+}
+
+function render(){
+  let doneCount = 0;
+  for (const item of DATA){
+    const row = rowEls[item.r];
+    const st = rowStatus(item);
+    row.classList.toggle('partial', st === 'partial');
+    row.classList.toggle('done', st === 'done');
+    if (st === 'done') doneCount++;
+    const s = state[item.r] || {};
+    for (const b of row.querySelectorAll('button.co')){
+      const on = !!s[b.dataset.k];
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+    row.hidden = filterOn && st === 'done';
+  }
+  document.getElementById('done').textContent = doneCount;
+  document.getElementById('bar').style.width = (TOTAL ? doneCount / TOTAL * 100 : 0) + '%';
+  document.getElementById('empty').hidden = !(filterOn && doneCount === TOTAL);
+}
+
+yearSel.addEventListener('change', () => { load(); render(); });
+monthSel.addEventListener('change', () => { load(); render(); });
+
+document.getElementById('filter').addEventListener('click', (e) => {
+  filterOn = !filterOn;
+  e.currentTarget.classList.toggle('on', filterOn);
+  render();
+});
+document.getElementById('reset').addEventListener('click', () => {
+  if (confirm(yearSel.value + '\\u5e74' + monthSel.value + '\\u6708\\u306e\\u30c1\\u30a7\\u30c3\\u30af\\u3092\\u3059\\u3079\\u3066\\u30ea\\u30bb\\u30c3\\u30c8\\u3057\\u307e\\u3059\\u304b\\uff1f')){
+    state = {}; save(); render();
+  }
+});
+
+document.getElementById('backup').addEventListener('click', async () => {
+  const dump = {};
+  for (const k of storeKeys()){
+    try {
+      const v = storeGet(k);
+      if (v) { const o = JSON.parse(v); if (o && Object.keys(o).length) dump[k] = o; }
+    } catch(e){}
+  }
+  const text = JSON.stringify(dump);
+  let copied = false;
+  try { await navigator.clipboard.writeText(text); copied = true; } catch(e){}
+  if (copied) alert('バックアップをコピーしました。メモ帳などに貼り付けて保存してください。');
+  else prompt('この文字列をコピーして保存してください', text);
+});
+document.getElementById('restore').addEventListener('click', () => {
+  const text = prompt('バックアップの文字列を貼り付けてください');
+  if (!text) return;
+  try {
+    const dump = JSON.parse(text);
+    let n = 0;
+    for (const k in dump){
+      if (k.indexOf('co-check-') === 0 && dump[k] && typeof dump[k] === 'object'){
+        storeSet(k, JSON.stringify(dump[k])); n++;
+      }
+    }
+    load(); render();
+    alert(n + 'か月分のチェックを復元しました。');
+  } catch(e){ alert('復元できませんでした。バックアップの文字列をそのまま貼り付けてください。'); }
+});
+
+// ---- PIN lock: data is AES-GCM encrypted; key derived from PIN via PBKDF2 ----
+function b64d(s){
+  const bin = atob(s);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+async function decryptWith(key){
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(ENC.iv)}, key, b64d(ENC.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function keyFromPin(pin){
+  const mat = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:b64d(ENC.salt), iterations:ENC.iter, hash:'SHA-256'},
+    mat, {name:'AES-GCM', length:256}, true, ['decrypt']);
+}
+function startApp(){
+  TOTAL = DATA.length;
+  document.getElementById('total').textContent = TOTAL;
+  document.getElementById('lock').hidden = true;
+  build(); load(); render();
+}
+async function unlock(){
+  const el = document.getElementById('pin');
+  const pin = el.value.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).trim();
+  if (!pin) return;
+  const err = document.getElementById('lockerr');
+  err.hidden = true;
+  try {
+    const key = await keyFromPin(pin);
+    DATA = await decryptWith(key);
+    const raw = new Uint8Array(await crypto.subtle.exportKey('raw', key));
+    let bin = '';
+    for (let i = 0; i < raw.length; i++) bin += String.fromCharCode(raw[i]);
+    storeSet('co-check-key', btoa(bin));
+    startApp();
+  } catch(e){ err.hidden = false; el.select(); }
+}
+document.getElementById('unlock').addEventListener('click', unlock);
+document.getElementById('pin').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+
+(async () => {
+  const cached = storeGet('co-check-key');
+  if (cached){
+    try {
+      const key = await crypto.subtle.importKey('raw', b64d(cached), 'AES-GCM', false, ['decrypt']);
+      DATA = await decryptWith(key);
+      startApp();
+      return;
+    } catch(e){}
+  }
+  document.getElementById('lock').hidden = false;
+  document.getElementById('pin').focus();
+})();
+</script>
+"""
+html = html.replace('__ENC__', enc_js)
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'index.html')
+with open(out, 'w', encoding='utf-8') as f:
+    f.write(html)
+print('written', out, len(html))
