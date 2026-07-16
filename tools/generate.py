@@ -61,6 +61,7 @@ html = """<meta charset="utf-8">
   color-scheme: light;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+[hidden]{display:none !important;}
 html,body{margin:0;}
 body{
   background:var(--bg); color:var(--ink);
