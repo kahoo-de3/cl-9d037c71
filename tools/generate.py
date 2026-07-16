@@ -167,11 +167,9 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
   </div>
   <div class="hrow3">
     <button class="chip" id="filter">未完了のみ表示</button>
-    <button class="chip" id="backup">バックアップ</button>
-    <button class="chip" id="restore">復元</button>
     <button class="chip reset" id="reset">リセット</button>
   </div>
-  <div class="banner" id="banner" hidden>⚠ この環境ではチェック内容の自動保存が使えないため、閉じると消えます。作業後に「バックアップ」でコピーし、次回「復元」で貼り付けてください。</div>
+  <div class="banner" id="banner" hidden>⚠ この環境ではチェック内容の自動保存が使えないため、閉じると消えます。</div>
 </header>
 <main id="list"></main>
 <div class="empty" id="empty" hidden>この月は全件チェック済みです 🎉</div>
@@ -206,19 +204,6 @@ function storeGet(key){
 function storeSet(key, val){
   if (storageOK){ try { localStorage.setItem(key, val); return; } catch(e){ storageOK = false; showBanner(); } }
   memStore[key] = val;
-}
-function storeKeys(){
-  if (storageOK){
-    try {
-      const ks = [];
-      for (let i = 0; i < localStorage.length; i++){
-        const k = localStorage.key(i);
-        if (k && k.indexOf('co-check-') === 0) ks.push(k);
-      }
-      return ks;
-    } catch(e){}
-  }
-  return Object.keys(memStore);
 }
 function showBanner(){ document.getElementById('banner').hidden = false; }
 if (!storageOK) showBanner();
@@ -319,36 +304,6 @@ document.getElementById('reset').addEventListener('click', () => {
   if (confirm(yearSel.value + '\\u5e74' + monthSel.value + '\\u6708\\u306e\\u30c1\\u30a7\\u30c3\\u30af\\u3092\\u3059\\u3079\\u3066\\u30ea\\u30bb\\u30c3\\u30c8\\u3057\\u307e\\u3059\\u304b\\uff1f')){
     state = {}; save(); render();
   }
-});
-
-document.getElementById('backup').addEventListener('click', async () => {
-  const dump = {};
-  for (const k of storeKeys()){
-    try {
-      const v = storeGet(k);
-      if (v) { const o = JSON.parse(v); if (o && Object.keys(o).length) dump[k] = o; }
-    } catch(e){}
-  }
-  const text = JSON.stringify(dump);
-  let copied = false;
-  try { await navigator.clipboard.writeText(text); copied = true; } catch(e){}
-  if (copied) alert('バックアップをコピーしました。メモ帳などに貼り付けて保存してください。');
-  else prompt('この文字列をコピーして保存してください', text);
-});
-document.getElementById('restore').addEventListener('click', () => {
-  const text = prompt('バックアップの文字列を貼り付けてください');
-  if (!text) return;
-  try {
-    const dump = JSON.parse(text);
-    let n = 0;
-    for (const k in dump){
-      if (k.indexOf('co-check-') === 0 && dump[k] && typeof dump[k] === 'object'){
-        storeSet(k, JSON.stringify(dump[k])); n++;
-      }
-    }
-    load(); render();
-    alert(n + 'か月分のチェックを復元しました。');
-  } catch(e){ alert('復元できませんでした。バックアップの文字列をそのまま貼り付けてください。'); }
 });
 
 // ---- PIN lock: data is AES-GCM encrypted; key derived from PIN via PBKDF2 ----
