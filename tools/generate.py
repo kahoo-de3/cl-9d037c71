@@ -7,22 +7,38 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 xlsx = sys.argv[1]
 pin = sys.argv[2]
 PBKDF2_ITER = 310000
+# 外字（私用領域）→通常漢字の置換表。新しい外字が出たら警告を見てここに追加する
+PUA_MAP = {chr(0xE682): chr(0x7950)}  # 祐
 wb = openpyxl.load_workbook(xlsx)
 ws = wb.active
 cells = {}
-for row in ws.iter_rows(min_row=1, max_row=200):
+for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
     for c in row:
         if c.value is not None:
             cells[c.coordinate] = str(c.value)
+
+def fix_pua(text, coord):
+    out = []
+    for ch in text:
+        if ch in PUA_MAP:
+            out.append(PUA_MAP[ch])
+        elif 0xE000 <= ord(ch) <= 0xF8FF:
+            print(f'警告: {coord} に未対応の外字 U+{ord(ch):04X} があります。'
+                  f'Web上で表示できないため PUA_MAP に置換先を追加してください。')
+            out.append(ch)
+        else:
+            out.append(ch)
+    return ''.join(out)
+
 rows = []
-for r in range(5, 109):
+for r in range(5, ws.max_row + 1):
     b = cells.get(f'B{r}')
     if not b:
         continue
     rows.append({
         'r': r,
-        'f': b.strip(),
-        'n': (cells.get(f'C{r}') or '').strip().replace(chr(0xE682), chr(0x7950)),
+        'f': fix_pua(b.strip(), f'B{r}'),
+        'n': fix_pua((cells.get(f'C{r}') or '').strip(), f'C{r}'),
         'c': f'D{r}' in cells,
         'o': f'E{r}' in cells,
     })
