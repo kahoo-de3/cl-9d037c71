@@ -254,7 +254,6 @@ main{padding:8px 10px 60px; max-width:640px; margin:0 auto;}
   background:var(--card); border:1px solid var(--line); border-radius:12px;
   padding:9px 10px 9px 12px; margin-bottom:6px;
 }
-.idx{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums; width:2em; flex:none; text-align:right;}
 .txt{flex:1; min-width:0;}
 .fac{font-weight:600; font-size:14px; overflow-wrap:anywhere;}
 .nm{font-size:13px; color:var(--sub);}
@@ -270,10 +269,10 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
 .spacer{width:46px; height:46px; flex:none;}
 /* partial tap -> light gray */
 .row.partial{background:var(--partial-bg);}
-.row.partial .fac, .row.partial .nm, .row.partial .idx{color:var(--partial-ink);}
+.row.partial .fac, .row.partial .nm{color:var(--partial-ink);}
 /* all tapped -> dark gray */
 .row.done{background:var(--done-bg); border-color:var(--done-bg);}
-.row.done .fac, .row.done .nm, .row.done .idx{color:var(--done-ink);}
+.row.done .fac, .row.done .nm{color:var(--done-ink);}
 .row.done .fac{text-decoration:line-through; text-decoration-thickness:1px;}
 .row.done button.co.on{background:transparent; border-color:var(--done-ink); color:var(--done-ink);}
 .empty{color:var(--sub); text-align:center; padding:40px 0; font-size:14px;}
@@ -392,8 +391,6 @@ function build(){
   for (const item of DATA){
     const row = document.createElement('div');
     row.className = 'row';
-    const idx = document.createElement('span');
-    idx.className = 'idx'; idx.textContent = item.r;
     const txt = document.createElement('div');
     txt.className = 'txt';
     const fac = document.createElement('div');
@@ -417,7 +414,7 @@ function build(){
         btns.appendChild(sp);
       }
     }
-    row.append(idx, txt, btns);
+    row.append(txt, btns);
     list.appendChild(row);
     rowEls[item.r] = row;
   }
