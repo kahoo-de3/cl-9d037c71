@@ -56,14 +56,51 @@ YOMI = {
     '松戸常盤平いいだ整形外科　医療': 'まつどときわだいらいいだせいけいげか',
     '稔台整形外科クリニック': 'みのりだいせいけいげかくりにっく',
     'もり整形外科クリニック　医療': 'もりせいけいげかくりにっく',
+    # --- データ2（愛知県）。読みが不確実なものは要確認 ---
+    'あいせい紀年病院　医療': 'あいせいきねんびょういん',
+    'あらかわ医院　医療': 'あらかわいいん',
+    'あおき整形外科': 'あおきせいけいげか',
+    '安田整形外科': 'やすだせいけいげか',
+    '旭労災病院　独法労': 'あさひろうさいびょういん',
+    'いしい外科三好クリニック　医療': 'いしいげかみよしくりにっく',
+    '梅森台レオ整形外科・ヒフ科': 'うめもりだいれおせいけいげかひふか',
+    'えさき整形外科リウマチ科　医療': 'えさきせいけいげかりうまちか',
+    '尾張旭いなもり整形外科': 'おわりあさひいなもりせいけいげか',
+    '岡田整形外科内科　医療': 'おかだせいけいげかないか',
+    'かぐやま整形外科痛みと運動ＣＬ': 'かぐやませいけいげかいたみとうんどうくりにっく',
+    '刈谷豊田総合病院　医療': 'かりやとよたそうごうびょういん',
+    'くまべ整形外科': 'くまべせいけいげか',
+    'こんどう整形外科　医療': 'こんどうせいけいげか',
+    '小早川整形外科・内科': 'こばやかわせいけいげかないか',
+    '桜井整形外科': 'さくらいせいけいげか',
+    '清水山整形外科クリニック': 'しみずやませいけいげかくりにっく',
+    '中京スパインクリニック': 'ちゅうきょうすぱいんくりにっく',
+    '中京病院　ＪＣＨ': 'ちゅうきょうびょういん',
+    '中部労災病院　独法労': 'ちゅうぶろうさいびょういん',
+    'トヨタ記念病院': 'とよたきねんびょういん',
+    '豊田厚生病院　厚生連': 'とよたこうせいびょういん',
+    '立松整形外科・内科クリニック': 'たてまつせいけいげかないかくりにっく',
+    '大同病院　医療': 'だいどうびょういん',
+    '中京病院': 'ちゅうきょうびょういん',
+    '南生協病院': 'みなみせいきょうびょういん',
+    '日進おりど病院　医療': 'にっしんおりどびょういん',
+    '名古屋市立大学みどり市民病院': 'なごやしりつだいがくみどりしみんびょういん',
+    '名鉄病院　健保': 'めいてつびょういん',
+    'ふくだ整形外科': 'ふくだせいけいげか',
+    '藤田医科大学病院': 'ふじたいかだいがくびょういん',
+    '碧海中央クリニック　医療': 'へきかいちゅうおうくりにっく',
+    '前原外科整形外科小児科　医療': 'まえはらげかせいけいげかしょうにか',
+    'みどり整形外科運動器クリニック': 'みどりせいけいげかうんどうきくりにっく',
+    'みやけ整形外科　医療': 'みやけせいけいげか',
+    'みよし市民病院': 'みよししみんびょういん',
+    '名古屋市立大学病院': 'なごやしりつだいがくびょういん',
+    'やくし整形クリニック': 'やくしせいけいくりにっく',
+    'よだ整形外科': 'よだせいけいげか',
+    '吉田整形外科人工関節クリニック': 'よしだせいけいげかじんこうかんせつくりにっく',
+    '吉田整形外科病院　医療': 'よしだせいけいげかびょういん',
+    '米田病院　医療': 'よねだびょういん',
+    '林整形外科クリニック': 'はやしせいけいげかくりにっく',
 }
-wb = openpyxl.load_workbook(xlsx)
-ws = wb.active
-cells = {}
-for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
-    for c in row:
-        if c.value is not None:
-            cells[c.coordinate] = str(c.value)
 
 def fix_pua(text, coord):
     out = []
@@ -78,37 +115,6 @@ def fix_pua(text, coord):
             out.append(ch)
     return ''.join(out)
 
-rows = []
-for r in range(5, ws.max_row + 1):
-    b = cells.get(f'B{r}')
-    if not b:
-        continue
-    rows.append({
-        'r': r,
-        'f': fix_pua(b.strip(), f'B{r}'),
-        'n': fix_pua((cells.get(f'C{r}') or '').strip(), f'C{r}'),
-        'c': f'D{r}' in cells,
-        'o': f'E{r}' in cells,
-    })
-
-# Excelに同じ名簿が2ブロック入っていることがあるため、施設名×氏名で重複統合
-# （C/Oフラグは論理和。行番号=保存キーは初出の行を使う）
-seen = {}
-unique_rows = []
-dup_count = 0
-for x in rows:
-    k = (x['f'], x['n'])
-    if k in seen:
-        seen[k]['c'] = seen[k]['c'] or x['c']
-        seen[k]['o'] = seen[k]['o'] or x['o']
-        dup_count += 1
-    else:
-        seen[k] = x
-        unique_rows.append(x)
-rows = unique_rows
-print('重複統合:', dup_count, '行 → ユニーク', len(rows), '行')
-
-# 施設名の読み（五十音順）でソート。同一施設は元のExcel行順を維持
 _SMALL = {'ぁ':'あ','ぃ':'い','ぅ':'う','ぇ':'え','ぉ':'お','っ':'つ','ゃ':'や','ゅ':'ゆ','ょ':'よ','ゎ':'わ'}
 def yomi_key(f):
     y = YOMI.get(f)
@@ -116,14 +122,71 @@ def yomi_key(f):
         print(f'警告: 施設「{f}」の読みが YOMI にありません。読みを追加してください（暫定で末尾に並べます）。')
         return 'ん' * 20 + f
     return ''.join(_SMALL.get(ch, ch) for ch in y if ch != 'ー')
-rows.sort(key=lambda x: (yomi_key(x['f']), x['r']))
 
-data_js = json.dumps(rows, ensure_ascii=False, separators=(',', ':'))
+def load_dataset(ws, label):
+    """1シートを読み込み、施設名×氏名で重複統合し、読みで五十音順ソートして返す。
+    ヘッダー行（B列='施設名'）を自動検出。C列(D)/O列(E)は値があれば該当品目ありと判定。"""
+    cells = {}
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
+        for c in row:
+            if c.value is not None:
+                cells[c.coordinate] = str(c.value)
+    # ヘッダー行を検出
+    header_r = None
+    for r in range(1, ws.max_row + 1):
+        if (cells.get(f'B{r}') or '').strip() == '施設名':
+            header_r = r
+            break
+    if header_r is None:
+        header_r = 4  # 従来レイアウトの既定
+    rows = []
+    for r in range(header_r + 1, ws.max_row + 1):
+        b = cells.get(f'B{r}')
+        if not b:
+            continue
+        rows.append({
+            'r': r,
+            'f': fix_pua(b.strip(), f'{ws.title}!B{r}'),
+            'n': fix_pua((cells.get(f'C{r}') or '').strip(), f'{ws.title}!C{r}'),
+            'c': f'D{r}' in cells,
+            'o': f'E{r}' in cells,
+        })
+    # 施設名×氏名で重複統合（C/Oフラグは論理和、保存キー=行番号は初出を使う）
+    seen = {}
+    unique_rows = []
+    dup = 0
+    for x in rows:
+        k = (x['f'], x['n'])
+        if k in seen:
+            seen[k]['c'] = seen[k]['c'] or x['c']
+            seen[k]['o'] = seen[k]['o'] or x['o']
+            dup += 1
+        else:
+            seen[k] = x
+            unique_rows.append(x)
+    unique_rows.sort(key=lambda x: (yomi_key(x['f']), x['r']))
+    print(f'[{label}] 重複統合 {dup} 行 → ユニーク {len(unique_rows)} 行 '
+          f'(C={sum(1 for x in unique_rows if x["c"] and not x["o"])} '
+          f'O={sum(1 for x in unique_rows if x["o"] and not x["c"])} '
+          f'両={sum(1 for x in unique_rows if x["c"] and x["o"])})')
+    return unique_rows
+
+wb = openpyxl.load_workbook(xlsx)
+sheets = wb.sheetnames
+# データ1 = 1枚目、データ2 = 2枚目（あれば）。sp=保存キー接頭辞（d1は従来互換で空）
+sets = []
+sets.append({'id': 'd1', 'name': 'データ１', 'sp': '',
+             'rows': load_dataset(wb[sheets[0]], 'データ１')})
+if len(sheets) >= 2:
+    sets.append({'id': 'd2', 'name': 'データ２', 'sp': 'd2-',
+                 'rows': load_dataset(wb[sheets[1]], 'データ２')})
+
+payload = json.dumps({'sets': sets}, ensure_ascii=False, separators=(',', ':'))
 
 salt = os.urandom(16)
 iv = os.urandom(12)
 key = hashlib.pbkdf2_hmac('sha256', pin.encode('utf-8'), salt, PBKDF2_ITER, dklen=32)
-ct = AESGCM(key).encrypt(iv, data_js.encode('utf-8'), None)
+ct = AESGCM(key).encrypt(iv, payload.encode('utf-8'), None)
 enc_js = json.dumps({
     'salt': base64.b64encode(salt).decode(),
     'iv': base64.b64encode(iv).decode(),
@@ -131,11 +194,6 @@ enc_js = json.dumps({
     'iter': PBKDF2_ITER,
     'len': len(pin),
 }, separators=(',', ':'))
-
-print('rows:', len(rows))
-print('C-only:', sum(1 for x in rows if x['c'] and not x['o']))
-print('O-only:', sum(1 for x in rows if x['o'] and not x['c']))
-print('both:', sum(1 for x in rows if x['c'] and x['o']))
 
 html = """<meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
@@ -165,7 +223,13 @@ header{
   padding:10px 14px 8px;
 }
 .hrow{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-h1{font-size:15px; font-weight:700; margin:0 auto 0 0; letter-spacing:.02em;}
+h1{font-size:15px; font-weight:700; margin:0; letter-spacing:.02em;}
+#dsToggle{
+  margin-right:auto;
+  border-color:var(--accent); color:var(--accent); font-weight:700;
+  display:inline-flex; align-items:center; gap:5px;
+}
+#dsToggle .swap{font-size:14px; line-height:1;}
 select{
   font:inherit; font-weight:600; color:var(--ink);
   background:var(--card); border:1px solid var(--btn-line); border-radius:8px;
@@ -249,6 +313,7 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
 <header>
   <div class="hrow">
     <h1>C/O チェック</h1>
+    <button class="chip" id="dsToggle" type="button"><span class="swap">⇄</span><span id="dsName">データ１</span></button>
     <select id="year" aria-label="年"></select>
     <select id="month" aria-label="月"></select>
   </div>
@@ -267,7 +332,9 @@ button.co.on{background:var(--accent); border-color:var(--accent); color:var(--a
 
 <script>
 const ENC = __ENC__;
-let DATA = [];
+let SETS = [];       // 復号後に代入される全データセット
+let curSet = null;   // 現在表示中のデータセット
+let DATA = [];       // curSet.rows のショートカット
 let TOTAL = 0;
 
 const yearSel = document.getElementById('year');
@@ -299,7 +366,7 @@ function storeSet(key, val){
 function showBanner(){ document.getElementById('banner').hidden = false; }
 if (!storageOK) showBanner();
 
-function storageKey(){ return 'co-check-' + yearSel.value + '-' + monthSel.value; }
+function storageKey(){ return 'co-check-' + (curSet ? curSet.sp : '') + yearSel.value + '-' + monthSel.value; }
 function load(){
   try { state = JSON.parse(storeGet(storageKey())) || {}; }
   catch(e){ state = {}; }
@@ -321,6 +388,7 @@ const rowEls = {};
 
 function build(){
   list.textContent = '';
+  for (const k in rowEls) delete rowEls[k];
   for (const item of DATA){
     const row = document.createElement('div');
     row.className = 'row';
@@ -398,6 +466,7 @@ document.getElementById('reset').addEventListener('click', () => {
 });
 
 // ---- PIN lock: data is AES-GCM encrypted; key derived from PIN via PBKDF2 ----
+let PAYLOAD = null;
 function b64d(s){
   const bin = atob(s);
   const u = new Uint8Array(bin.length);
@@ -419,12 +488,30 @@ function setLocked(locked){
   document.querySelector('header').hidden = locked;
   document.getElementById('list').hidden = locked;
 }
-function startApp(){
+function selectDataset(id){
+  const s = SETS.find(x => x.id === id) || SETS[0];
+  curSet = s;
+  DATA = s.rows;
   TOTAL = DATA.length;
+  document.getElementById('dsName').textContent = s.name;
   document.getElementById('total').textContent = TOTAL;
-  setLocked(false);
+  document.getElementById('dsToggle').hidden = SETS.length < 2;
+  storeSet('co-check-dataset', s.id);
+  filterOn = false;
+  document.getElementById('filter').classList.remove('on');
   build(); load(); render();
 }
+function startApp(){
+  SETS = PAYLOAD.sets || [];
+  const saved = storeGet('co-check-dataset');
+  setLocked(false);
+  selectDataset(saved || (SETS[0] && SETS[0].id));
+}
+document.getElementById('dsToggle').addEventListener('click', () => {
+  if (SETS.length < 2) return;
+  const i = SETS.findIndex(x => x.id === curSet.id);
+  selectDataset(SETS[(i + 1) % SETS.length].id);
+});
 let unlocking = false;
 async function unlock(){
   if (unlocking) return;
@@ -440,7 +527,7 @@ async function unlock(){
   try {
     if (!(window.crypto && crypto.subtle)) throw new Error('no-webcrypto');
     const key = await keyFromPin(pin);
-    DATA = await decryptWith(key);
+    PAYLOAD = await decryptWith(key);
     const raw = new Uint8Array(await crypto.subtle.exportKey('raw', key));
     let bin = '';
     for (let i = 0; i < raw.length; i++) bin += String.fromCharCode(raw[i]);
@@ -480,7 +567,7 @@ window.addEventListener('error', ev => {
   if (cached){
     try {
       const key = await crypto.subtle.importKey('raw', b64d(cached), 'AES-GCM', false, ['decrypt']);
-      DATA = await decryptWith(key);
+      PAYLOAD = await decryptWith(key);
       startApp();
       return;
     } catch(e){}
